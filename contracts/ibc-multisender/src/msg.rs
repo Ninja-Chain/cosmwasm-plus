@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use cw20::Cw20ReceiveMsg;
 
 use crate::amount::Amount;
-use crate::state::ChannelInfo;
+use crate::state::{ChannelInfo, RecipientInfo};
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct InitMsg {
@@ -21,24 +21,33 @@ pub struct MigrateMsg {}
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
-    Receive(Cw20ReceiveMsg),
+    // Receive(Cw20ReceiveMsg),
     /// This allows us to transfer *exactly one* native token
     Transfer(TransferMsg),
 
 }
 
-/// This is the message we accept via Receive
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TransferMsg {
     /// The local channel to send the packets on
     pub channel: String,
-    /// The remote address to send to
-    /// Don't use HumanAddress as this will likely have a different Bech32 prefix than we use
-    /// and cannot be validated locally
-    pub remote_address: String,
+    pub recipients: Vec<RecipientInfo>,
     /// How long the packet lives in seconds. If not specified, use default_timeout
     pub timeout: Option<u64>,
 }
+
+// /// This is the message we accept via Receive
+// #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+// pub struct TransferMsg {
+//     /// The local channel to send the packets on
+//     pub channel: String,
+//     /// The remote address to send to
+//     /// Don't use HumanAddress as this will likely have a different Bech32 prefix than we use
+//     /// and cannot be validated locally
+//     pub remote_address: String,
+//     /// How long the packet lives in seconds. If not specified, use default_timeout
+//     pub timeout: Option<u64>,
+// }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]

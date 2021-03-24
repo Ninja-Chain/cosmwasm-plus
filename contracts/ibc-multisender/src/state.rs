@@ -3,7 +3,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{IbcEndpoint, Uint128};
+use cosmwasm_std::{IbcEndpoint, Uint128, HumanAddr, Coin};
 use cw_storage_plus::{Item, Map};
 
 pub const CONFIG: Item<Config> = Item::new("ics20_config");
@@ -33,4 +33,12 @@ pub struct ChannelInfo {
     pub counterparty_endpoint: IbcEndpoint,
     /// the connection this exists on (you can use to query client/consensus info)
     pub connection_id: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct RecipientInfo {
+    /// id of this channel
+    pub address: HumanAddr,
+    /// the remote channel/port we connect to
+    pub amount: Vec<Coin>,
 }

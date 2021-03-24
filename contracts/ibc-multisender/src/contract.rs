@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, HumanAddr, IbcMsg,
-    IbcQuery, MessageInfo, Order, PortIdResponse, Response, StdResult,
+    IbcQuery, MessageInfo, Order, PortIdResponse, Response, StdResult, Uint128, CosmosMsg
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -22,20 +22,20 @@ use cw0::{nonpayable, one_coin};
 const CONTRACT_NAME: &str = "multisender-test";
 const CONTRACT_VERSION: &str = "21.03.24";
 
-// #[cfg_attr(not(feature = "library"), entry_point)]
-// pub fn instantiate(
-//     deps: DepsMut,
-//     _env: Env,
-//     _info: MessageInfo,
-//     msg: InitMsg,
-// ) -> Result<Response, ContractError> {
-//     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-//     let cfg = Config {
-//         default_timeout: msg.default_timeout,
-//     };
-//     CONFIG.save(deps.storage, &cfg)?;
-//     Ok(Response::default())
-// }
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InitMsg,
+) -> Result<Response, ContractError> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    let cfg = Config {
+        default_timeout: msg.default_timeout,
+    };
+    CONFIG.save(deps.storage, &cfg)?;
+    Ok(Response::default())
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
@@ -45,10 +45,13 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Receive(msg) => execute_receive(deps, env, info, msg),
+        // ExecuteMsg::Receive(msg) => execute_receive(deps, env, info, msg),
+        // ExecuteMsg::Transfer(msg) => {
+        //     let coin = one_coin(&info)?;
+        //     execute_transfer(deps, env, msg, Amount::Native(coin), info.sender)
+        // }
         ExecuteMsg::Transfer(msg) => {
-            let coin = one_coin(&info)?;
-            execute_transfer(deps, env, msg, Amount::Native(coin), info.sender)
+            execute_transfer(deps, env, msg, info)
         }
     }
 }
@@ -76,59 +79,35 @@ pub fn execute_transfer(
     deps: DepsMut,
     env: Env,
     msg: TransferMsg,
-    amount: Amount,
-    sender: HumanAddr,
+    info: MessageInfo,
 ) -> Result<Response, ContractError> {
+    let mut attributes = Vec::new();
+    let mut messages: Vec<CosmosMsg> = Vec::new();
+    let mut total = Uint128::zero();
 
-    
-    if amount.is_empty() {
-        return Err(ContractError::NoFunds {});
+    for recipient in msg.clone().recipients {
+        total += recipient.clone().amount[0].amount;
+        attributes.push(attr("action", "transfer"));
+        attributes.push(attr("to",recipient.clone().address));
+        messages.push(IbcMsg::Transfer {
+            channel_id: msg.clone().channel,
+            to_address: recipient.clone().address,
+            amount: recipient.amount[0].clone(),
+            timeout_block: None,
+            timeout_timestamp: None,
+        }.into());
     }
+    
     // ensure the requested channel is registered
     // FIXME: add a .has method to map to make this faster
     if CHANNEL_INFO.may_load(deps.storage, &msg.channel)?.is_none() {
         return Err(ContractError::NoSuchChannel { id: msg.channel });
     }
 
-    // delta from user is in seconds
-    let timeout_delta = match msg.timeout {
-        Some(t) => t,
-        None => CONFIG.load(deps.storage)?.default_timeout,
-    };
-    // timeout is in nanoseconds
-    let timeout = (env.block.time + timeout_delta) * 1_000_000_000;
-
-    // build ics20 packet
-    let packet = Ics20Packet::new(
-        amount.amount(),
-        amount.denom(),
-        &sender,
-        &msg.remote_address,
-    );
-    packet.validate()?;
-
-    // prepare message
-    let msg = IbcMsg::SendPacket {
-        channel_id: msg.channel,
-        data: to_binary(&packet)?,
-        timeout_block: None,
-        timeout_timestamp: Some(timeout),
-    };
-
-    // Note: we update local state when we get ack - do not count this transfer towards anything until acked
-    // similar event messages like ibctransfer module
-    let attributes = vec![
-        attr("action", "transfer"),
-        attr("sender", &packet.sender),
-        attr("receiver", &packet.receiver),
-        attr("denom", &packet.denom),
-        attr("amount", &packet.amount),
-    ];
-
     // send response
     let res = Response {
         submessages: vec![],
-        messages: vec![msg.into()],
+        messages,
         attributes,
         data: None,
     };
@@ -207,55 +186,55 @@ pub fn execute_transfer(
 //     Ok(Response::default())
 // }
 
-// #[cfg_attr(not(feature = "library"), entry_point)]
-// pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-//     match msg {
-//         QueryMsg::Port {} => to_binary(&query_port(deps)?),
-//         QueryMsg::ListChannels {} => to_binary(&query_list(deps)?),
-//         QueryMsg::Channel { id } => to_binary(&query_channel(deps, id)?),
-//     }
-// }
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::Port {} => to_binary(&query_port(deps)?),
+        QueryMsg::ListChannels {} => to_binary(&query_list(deps)?),
+        QueryMsg::Channel { id } => to_binary(&query_channel(deps, id)?),
+    }
+}
 
-// fn query_port(deps: Deps) -> StdResult<PortResponse> {
-//     let query = IbcQuery::PortId {}.into();
-//     let PortIdResponse { port_id } = deps.querier.query(&query)?;
-//     Ok(PortResponse { port_id })
-// }
+fn query_port(deps: Deps) -> StdResult<PortResponse> {
+    let query = IbcQuery::PortId {}.into();
+    let PortIdResponse { port_id } = deps.querier.query(&query)?;
+    Ok(PortResponse { port_id })
+}
 
-// fn query_list(deps: Deps) -> StdResult<ListChannelsResponse> {
-//     let channels: StdResult<Vec<_>> = CHANNEL_INFO
-//         .range(deps.storage, None, None, Order::Ascending)
-//         .map(|r| r.map(|(_, v)| v))
-//         .collect();
-//     Ok(ListChannelsResponse {
-//         channels: channels?,
-//     })
-// }
+fn query_list(deps: Deps) -> StdResult<ListChannelsResponse> {
+    let channels: StdResult<Vec<_>> = CHANNEL_INFO
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|r| r.map(|(_, v)| v))
+        .collect();
+    Ok(ListChannelsResponse {
+        channels: channels?,
+    })
+}
 
-// // make public for ibc tests
-// pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
-//     let info = CHANNEL_INFO.load(deps.storage, &id)?;
-//     // this returns Vec<(outstanding, total)>
-//     let state: StdResult<Vec<_>> = CHANNEL_STATE
-//         .prefix(&id)
-//         .range(deps.storage, None, None, Order::Ascending)
-//         .map(|r| {
-//             let (k, v) = r?;
-//             let denom = String::from_utf8(k)?;
-//             let outstanding = Amount::from_parts(denom.clone(), v.outstanding);
-//             let total = Amount::from_parts(denom, v.total_sent);
-//             Ok((outstanding, total))
-//         })
-//         .collect();
-//     // we want (Vec<outstanding>, Vec<total>)
-//     let (balances, total_sent) = state?.into_iter().unzip();
+// make public for ibc tests
+pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
+    let info = CHANNEL_INFO.load(deps.storage, &id)?;
+    // this returns Vec<(outstanding, total)>
+    let state: StdResult<Vec<_>> = CHANNEL_STATE
+        .prefix(&id)
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|r| {
+            let (k, v) = r?;
+            let denom = String::from_utf8(k)?;
+            let outstanding = Amount::from_parts(denom.clone(), v.outstanding);
+            let total = Amount::from_parts(denom, v.total_sent);
+            Ok((outstanding, total))
+        })
+        .collect();
+    // we want (Vec<outstanding>, Vec<total>)
+    let (balances, total_sent) = state?.into_iter().unzip();
 
-//     Ok(ChannelResponse {
-//         info,
-//         balances,
-//         total_sent,
-//     })
-// }
+    Ok(ChannelResponse {
+        info,
+        balances,
+        total_sent,
+    })
+}
 
 // #[cfg(test)]
 // mod test {
