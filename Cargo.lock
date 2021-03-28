@@ -361,6 +361,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw20-multisender"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw0",
+ "cw2",
+ "cw20",
+ "cw20-base",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw20-staking"
 version = "0.6.0-alpha1"
 dependencies = [
