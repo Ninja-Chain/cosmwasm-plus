@@ -49,18 +49,17 @@ pub fn execute_receive(
     let balance = Balance::Cw20(Cw20Coin {
         address: deps.api.canonical_address(&info.sender)?,
         amount: wrapper.amount,
-    });
+    });   
     match msg {
-        ReceiveMsg::Send { recipients } => execute_send(deps, recipients, balance),
+        ReceiveMsg::Send { recipients } => execute_send(deps, recipients),
     }
 }
 
 pub fn execute_send(
     deps: DepsMut,
     recipients: Vec<Recipient>,
-    balance: Balance,
 ) -> Result<Response, ContractError> {
-    let messages = send_tokens(deps.api, recipients, balance)?;
+    let messages = send_tokens(deps.api, recipients)?;
     let attributes = vec![attr("action", "send")];
     Ok(Response {
         submessages: vec![],
@@ -73,7 +72,6 @@ pub fn execute_send(
 fn send_tokens(
     api: &dyn Api,
     recipients: Vec<Recipient>,
-    balance: Balance,
 ) -> StdResult<Vec<CosmosMsg>> {
     let mut msgs = vec![];
 
