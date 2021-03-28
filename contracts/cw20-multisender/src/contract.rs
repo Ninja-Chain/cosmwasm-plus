@@ -71,7 +71,7 @@ fn send_tokens(api: &dyn Api, recipients: Vec<Recipient>) -> StdResult<Vec<Cosmo
                     amount: c.amount,
                 };
                 let exec = WasmMsg::Execute {
-                    contract_addr: api.human_address(&c.address)?,
+                    contract_addr: c.clone().address,
                     msg: to_binary(&msg)?,
                     send: vec![],
                 };

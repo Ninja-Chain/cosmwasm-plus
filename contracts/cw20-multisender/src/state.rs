@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Coin, HumanAddr};
 
-use cw20::{Balance, Cw20Coin};
+use cw20::{Balance, Cw20Coin, Cw20CoinHuman};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct GenericBalance {
@@ -46,8 +46,14 @@ impl GenericBalance {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+pub struct GenericBalanceHuman {
+    pub native: Vec<Coin>,
+    pub cw20: Vec<Cw20CoinHuman>,
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Recipient {
     pub address: HumanAddr,
-    pub amount: GenericBalance,
+    pub amount: GenericBalanceHuman,
 }
